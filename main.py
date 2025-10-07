@@ -73,11 +73,26 @@ def delete_user(id: str):
 # @app.post("/rest/media")
 # def upload_media(): ...
 # @app.get("/rest/media/{blob_name}")
-# def download_media(blob_name: str): ...
+# def download_media(blob_name: str): 
+#     pass
 
-# # LegoSet
-# @app.post("/rest/legoset")
-# def create_legoset(): ...
+# LegoSet
+@app.post("/rest/legoset")
+def create_legoset(lego_set: LegoSetCreate): 
+    lego_set_id = uuid.uuid4()
+    new_lego_set = {
+        "id": str(lego_set_id),
+        "name": lego_set.name,
+        "pk": "LEGOSET",
+        "code_number": lego_set.code_number,
+        "description": lego_set.description,
+        "photo_blob_names": lego_set.photo_blob_names,
+        "owner_id": lego_set.owner_id,
+    }
+    legosets_container.create_item(new_lego_set)
+    return new_lego_set
+
+
 @app.get("/rest/legoset")
 def list_legosets():
     query = "SELECT * FROM c"
@@ -87,6 +102,8 @@ def list_legosets():
     ))
     legosets = [LegoSetOutput(**legoset) for legoset in legosets]
     return legosets
+
+
 @app.get("/rest/legoset/{id}")
 def get_legoset(id: str):
     try:
@@ -94,6 +111,8 @@ def get_legoset(id: str):
         return LegoSetOutput(**legoset)
     except exceptions.CosmosResourceNotFoundError:
         return {"error": "Lego set not found"}
+    
+
 # @app.put("/rest/legoset/{id}")
 # def update_legoset(id: str): ...
 @app.delete("/rest/legoset/{id}")

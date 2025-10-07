@@ -32,13 +32,14 @@ class LegoSetCreate(BaseModel):
     code_number: str
     description: Optional[str] = None
     photo_blob_names: List[str] = Field(..., min_items=1)
-
+    owner_id: Optional[str] = None
 
 class LegoSetUpdate(BaseModel):
     name: Optional[str] = None
     code_number: Optional[str] = None
     description: Optional[str] = None
     photo_blob_names: Optional[List[str]] = None
+    owner_id: Optional[str] = None
 
 
 class LegoSetOutput(BaseModel):
@@ -46,7 +47,7 @@ class LegoSetOutput(BaseModel):
     name: str
     code_number: str
     description: Optional[str] = None
-    photo_urls: List[str]
+    photo_blob_names: List[str]
     owner_id: Optional[str] = None
 
 
