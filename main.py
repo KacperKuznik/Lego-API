@@ -2,7 +2,7 @@ from typing import Union
 from models import *
 from utils import hash_password, verify_password
 from cosmosdb import database
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import uuid
 from azure.cosmos import exceptions
 
@@ -111,7 +111,6 @@ def get_legoset(id: str):
         return LegoSetOutput(**legoset)
     except exceptions.CosmosResourceNotFoundError:
         return {"error": "Lego set not found"}
-    
 
 # @app.put("/rest/legoset/{id}")
 # def update_legoset(id: str): ...
@@ -123,11 +122,47 @@ def delete_legoset(id: str):
     except exceptions.CosmosResourceNotFoundError:
         return {"error": "Lego set not found"}
 
-# # Comments
-# @app.post("/rest/legoset/{id}/comment")
-# def create_comment(id: str): ...
-# @app.get("/rest/legoset/{id}/comment")
-# def list_comments(id: str): ...
+
+# Comments
+@app.post("/rest/legoset/{id}/comment")
+def create_comment(id: str, comment: CommentCreate):
+    # check if legoset exists
+    try:
+        legoset = legosets_container.read_item(item=id, partition_key="LEGOSET")
+    except:
+        raise HTTPException(status_code=404, detail="Lego set not found")
+    #check if user exists
+    try: # ?????
+        user = users_container.read_item(item=comment.user_id, partition_key="USER")
+    except:
+        raise HTTPException(status_code=404, detail="User not found")
+    # create the comment
+    comment_id = uuid.uuid4()
+    new_comment = {
+        "id": str(comment_id),
+        "pk": "COMMENT",
+        "user_id": comment.user_id, # ?????
+        "legoset_id": comment.legoset_id,
+        "text": comment.text,
+        "created_at": datetime.datetime.now().isoformat(),
+    }
+    comments_container.create_item(new_comment)
+    return new_comment
+
+@app.get("/rest/legoset/{id}/comment")
+def list_comments(id: str): 
+    try:
+        legoset = legosets_container.read_item(item=id, partition_key="LEGOSET")
+    except:
+        raise HTTPException(status_code=404, detail="Lego set not found")
+
+    query = f"SELECT * FROM c WHERE c.legoset_id='{id}'" 
+    comments = list(comments_container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+    comments = [CommentOut(**comment) for comment in comments]
+    return comments
 
 # # Auction
 # @app.post("/rest/auction")
