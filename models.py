@@ -78,7 +78,7 @@ class AuctionOut(BaseModel):
     seller_id: str
     base_price: float
     close_date: str
-    bids: List[dict]
+    bids: Optional[List[dict]] = []
 
 
 class BidCreate(BaseModel):

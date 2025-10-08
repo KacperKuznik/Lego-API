@@ -140,7 +140,7 @@ def create_comment(id: str, comment: CommentCreate):
     comment_id = uuid.uuid4()
     new_comment = {
         "id": str(comment_id),
-        "pk": "COMMENT",
+        "pk": comment.legoset_id, # the comments get saved closer to the legoset
         "user_id": comment.user_id, # ?????
         "legoset_id": comment.legoset_id,
         "text": comment.text,
@@ -164,10 +164,42 @@ def list_comments(id: str):
     comments = [CommentOut(**comment) for comment in comments]
     return comments
 
-# # Auction
-# @app.post("/rest/auction")
-# def create_auction(): ...
-# @app.get("/rest/auction")
-# def list_auctions(): ...
+# Auction
+@app.post("/rest/auction")
+def create_auction(auction: AuctionCreate):
+    # check if legoset exists
+    try:
+        legoset = legosets_container.read_item(item=auction.legoset_id, partition_key="LEGOSET")
+    except:
+        raise HTTPException(status_code=404, detail="Lego set not found")
+    #check if user exists
+    try: # ?????
+        user = users_container.read_item(item=auction.seller_id, partition_key="USER")
+    except:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    auction_id = uuid.uuid4()
+    new_auction = {
+        "id": str(auction_id),
+        "pk": auction.legoset_id,
+        "legoset_id": auction.legoset_id,
+        "seller_id": auction.seller_id,
+        "base_price": float(auction.base_price),
+        "close_date": auction.close_date.isoformat(),
+    } 
+    auctions_container.create_item(new_auction)
+    return new_auction
+
+@app.get("/rest/auction")
+def list_auctions(): 
+    query = "SELECT * FROM c"
+    auctions = list(auctions_container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+    auctions = [AuctionOut(**auction) for auction in auctions]
+    return auctions
+
+# Bid
 # @app.post("/rest/auction/{id}/bid")
 # def bid_auction(id: str): ...
