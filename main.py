@@ -7,10 +7,12 @@ import uuid
 from azure.cosmos import exceptions
 
 app = FastAPI()
-users_container = database.get_container_client("users")
+users_container =    database.get_container_client("users")
 legosets_container = database.get_container_client("legosets")
 comments_container = database.get_container_client("comments")
 auctions_container = database.get_container_client("auctions")
+bids_container =     database.get_container_client("bids")
+
 
 # User
 @app.post("/rest/user")
@@ -172,7 +174,7 @@ def create_auction(auction: AuctionCreate):
         legoset = legosets_container.read_item(item=auction.legoset_id, partition_key="LEGOSET")
     except:
         raise HTTPException(status_code=404, detail="Lego set not found")
-    #check if user exists
+    # check if user exists
     try: # ?????
         user = users_container.read_item(item=auction.seller_id, partition_key="USER")
     except:
@@ -201,5 +203,48 @@ def list_auctions():
     return auctions
 
 # Bid
-# @app.post("/rest/auction/{id}/bid")
-# def bid_auction(id: str): ...
+@app.post("/rest/auction/{id}/bid")
+def bid_auction(id: str, bid: BidCreate):
+    # check if auction exists
+    query = f"SELECT * FROM c WHERE c.id = '{id}'"
+    results = list(auctions_container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+
+    if not results:
+        raise HTTPException(status_code=404, detail="Auction not found")
+
+    #check if user exists
+    try: # ?????
+        user = users_container.read_item(item=bid.bidder_id, partition_key="USER")
+    except:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    auction = results[0]
+
+    # get bids to check the highest amount
+    query = f"SELECT * FROM c WHERE c.auction_id='{id}' ORDER BY c.amount DESC" 
+    bids = list(bids_container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+
+    if bids:
+        highest_bid = bids[0]["amount"]
+        # refuse request if the bid is too small
+        if float(bid.amount) <= float(highest_bid):
+            raise HTTPException(status_code=403, detail="Bid amount is too small")
+    if float(auction["base_price"]) > float(bid.amount):
+        raise HTTPException(status_code=403, detail="Bid amount is smaller than base price")
+
+    bid_id = uuid.uuid4()
+    new_bid = {
+        "id": str(bid_id),
+        "auction_id": auction["id"],
+        "bidder_id": bid.bidder_id,
+        "amount": float(bid.amount)
+    }
+    bids_container.create_item(new_bid)
+    return new_bid
+

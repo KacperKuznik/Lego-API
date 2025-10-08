@@ -15,7 +15,7 @@ database = client.create_database_if_not_exists(
     offer_throughput=1000
 )
 
-containers = ["users", "legosets", "comments", "auctions"]
+containers = ["users", "legosets", "comments", "auctions", "bids"]
 
 for container_name in containers:
     database.create_container_if_not_exists(
