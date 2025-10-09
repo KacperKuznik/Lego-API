@@ -1,7 +1,9 @@
+import json
 from typing import Union
 from models import *
 from utils import hash_password, verify_password
 from cosmosdb import database
+from rediscache import r
 from fastapi import FastAPI
 import uuid
 from azure.cosmos import exceptions
@@ -11,6 +13,7 @@ users_container = database.get_container_client("users")
 legosets_container = database.get_container_client("legosets")
 comments_container = database.get_container_client("comments")
 auctions_container = database.get_container_client("auctions")
+
 
 # User
 @app.post("/rest/user")
@@ -32,12 +35,16 @@ def create_user(user: UserCreate):
 
 @app.get("/rest/user")
 def list_users():
+    cached_users = r.get("users_list")
+    if cached_users:
+        return json.loads(cached_users)
     query = "SELECT * FROM c"
     users = list(users_container.query_items(
         query=query,
         enable_cross_partition_query=True
     ))
     users = [UserOutput(**user) for user in users]
+    r.setex("users_list", 60, json.dumps([user.model_dump() for user in users]))
     return users
 
 @app.get("/rest/user/{id}")
@@ -80,12 +87,16 @@ def delete_user(id: str):
 # def create_legoset(): ...
 @app.get("/rest/legoset")
 def list_legosets():
+    cached_legoset = r.get("legosets_list")
+    if cached_legoset:
+        return json.loads(cached_legoset)
     query = "SELECT * FROM c"
     legosets = list(legosets_container.query_items(
         query=query,
         enable_cross_partition_query=True
     ))
     legosets = [LegoSetOutput(**legoset) for legoset in legosets]
+    r.setex("legosets_list", 60, json.dumps([legoset.model_dump() for legoset in legosets]))
     return legosets
 @app.get("/rest/legoset/{id}")
 def get_legoset(id: str):
