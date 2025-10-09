@@ -4,15 +4,17 @@ from models import *
 from utils import hash_password, verify_password
 from cosmosdb import database
 from rediscache import r
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import uuid
 from azure.cosmos import exceptions
 
 app = FastAPI()
-users_container = database.get_container_client("users")
+users_container =    database.get_container_client("users")
 legosets_container = database.get_container_client("legosets")
 comments_container = database.get_container_client("comments")
 auctions_container = database.get_container_client("auctions")
+bids_container =     database.get_container_client("bids")
+
 
 
 # User
@@ -80,11 +82,26 @@ def delete_user(id: str):
 # @app.post("/rest/media")
 # def upload_media(): ...
 # @app.get("/rest/media/{blob_name}")
-# def download_media(blob_name: str): ...
+# def download_media(blob_name: str): 
+#     pass
 
-# # LegoSet
-# @app.post("/rest/legoset")
-# def create_legoset(): ...
+# LegoSet
+@app.post("/rest/legoset")
+def create_legoset(lego_set: LegoSetCreate): 
+    lego_set_id = uuid.uuid4()
+    new_lego_set = {
+        "id": str(lego_set_id),
+        "name": lego_set.name,
+        "pk": "LEGOSET",
+        "code_number": lego_set.code_number,
+        "description": lego_set.description,
+        "photo_blob_names": lego_set.photo_blob_names,
+        "owner_id": lego_set.owner_id,
+    }
+    legosets_container.create_item(new_lego_set)
+    return new_lego_set
+
+
 @app.get("/rest/legoset")
 def list_legosets():
     cached_legoset = r.get("legosets_list")
@@ -98,6 +115,8 @@ def list_legosets():
     legosets = [LegoSetOutput(**legoset) for legoset in legosets]
     r.setex("legosets_list", 60, json.dumps([legoset.model_dump() for legoset in legosets]))
     return legosets
+
+
 @app.get("/rest/legoset/{id}")
 def get_legoset(id: str):
     try:
@@ -105,6 +124,7 @@ def get_legoset(id: str):
         return LegoSetOutput(**legoset)
     except exceptions.CosmosResourceNotFoundError:
         return {"error": "Lego set not found"}
+
 # @app.put("/rest/legoset/{id}")
 # def update_legoset(id: str): ...
 @app.delete("/rest/legoset/{id}")
@@ -115,16 +135,127 @@ def delete_legoset(id: str):
     except exceptions.CosmosResourceNotFoundError:
         return {"error": "Lego set not found"}
 
-# # Comments
-# @app.post("/rest/legoset/{id}/comment")
-# def create_comment(id: str): ...
-# @app.get("/rest/legoset/{id}/comment")
-# def list_comments(id: str): ...
 
-# # Auction
-# @app.post("/rest/auction")
-# def create_auction(): ...
-# @app.get("/rest/auction")
-# def list_auctions(): ...
-# @app.post("/rest/auction/{id}/bid")
-# def bid_auction(id: str): ...
+# Comments
+@app.post("/rest/legoset/{id}/comment")
+def create_comment(id: str, comment: CommentCreate):
+    # check if legoset exists
+    try:
+        legoset = legosets_container.read_item(item=id, partition_key="LEGOSET")
+    except:
+        raise HTTPException(status_code=404, detail="Lego set not found")
+    #check if user exists
+    try: # ?????
+        user = users_container.read_item(item=comment.user_id, partition_key="USER")
+    except:
+        raise HTTPException(status_code=404, detail="User not found")
+    # create the comment
+    comment_id = uuid.uuid4()
+    new_comment = {
+        "id": str(comment_id),
+        "pk": comment.legoset_id, # the comments get saved closer to the legoset
+        "user_id": comment.user_id, # ?????
+        "legoset_id": comment.legoset_id,
+        "text": comment.text,
+        "created_at": datetime.datetime.now().isoformat(),
+    }
+    comments_container.create_item(new_comment)
+    return new_comment
+
+@app.get("/rest/legoset/{id}/comment")
+def list_comments(id: str): 
+    try:
+        legoset = legosets_container.read_item(item=id, partition_key="LEGOSET")
+    except:
+        raise HTTPException(status_code=404, detail="Lego set not found")
+
+    query = f"SELECT * FROM c WHERE c.legoset_id='{id}'" 
+    comments = list(comments_container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+    comments = [CommentOut(**comment) for comment in comments]
+    return comments
+
+# Auction
+@app.post("/rest/auction")
+def create_auction(auction: AuctionCreate):
+    # check if legoset exists
+    try:
+        legoset = legosets_container.read_item(item=auction.legoset_id, partition_key="LEGOSET")
+    except:
+        raise HTTPException(status_code=404, detail="Lego set not found")
+    # check if user exists
+    try: # ?????
+        user = users_container.read_item(item=auction.seller_id, partition_key="USER")
+    except:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    auction_id = uuid.uuid4()
+    new_auction = {
+        "id": str(auction_id),
+        "pk": auction.legoset_id,
+        "legoset_id": auction.legoset_id,
+        "seller_id": auction.seller_id,
+        "base_price": float(auction.base_price),
+        "close_date": auction.close_date.isoformat(),
+    } 
+    auctions_container.create_item(new_auction)
+    return new_auction
+
+@app.get("/rest/auction")
+def list_auctions(): 
+    query = "SELECT * FROM c"
+    auctions = list(auctions_container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+    auctions = [AuctionOut(**auction) for auction in auctions]
+    return auctions
+
+# Bid
+@app.post("/rest/auction/{id}/bid")
+def bid_auction(id: str, bid: BidCreate):
+    # check if auction exists
+    query = f"SELECT * FROM c WHERE c.id = '{id}'"
+    results = list(auctions_container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+
+    if not results:
+        raise HTTPException(status_code=404, detail="Auction not found")
+
+    #check if user exists
+    try: # ?????
+        user = users_container.read_item(item=bid.bidder_id, partition_key="USER")
+    except:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    auction = results[0]
+
+    # get bids to check the highest amount
+    query = f"SELECT * FROM c WHERE c.auction_id='{id}' ORDER BY c.amount DESC" 
+    bids = list(bids_container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+
+    if bids:
+        highest_bid = bids[0]["amount"]
+        # refuse request if the bid is too small
+        if float(bid.amount) <= float(highest_bid):
+            raise HTTPException(status_code=403, detail="Bid amount is too small")
+    if float(auction["base_price"]) > float(bid.amount):
+        raise HTTPException(status_code=403, detail="Bid amount is smaller than base price")
+
+    bid_id = uuid.uuid4()
+    new_bid = {
+        "id": str(bid_id),
+        "auction_id": auction["id"],
+        "bidder_id": bid.bidder_id,
+        "amount": float(bid.amount)
+    }
+    bids_container.create_item(new_bid)
+    return new_bid
+
