@@ -15,6 +15,8 @@ if not REDIS_ENDPOINT or not REDIS_PORT or not REDIS_KEY:
 
 print()  # Add a new line
 
+r = None
+
 try:
     # Create a Redis client using the key for authentication
     r = redis.Redis(
@@ -35,3 +37,5 @@ except redis.AuthenticationError:
     print("Authentication failed. Check your Redis key.")
 except Exception as e:
     print(f"Connection failed: {e}")
+
+redis_client = r

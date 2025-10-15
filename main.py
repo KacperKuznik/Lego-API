@@ -3,7 +3,7 @@ from typing import Union
 from models import *
 from utils import hash_password, verify_password
 from cosmosdb import database
-from rediscache import r
+from rediscache import redis_client as r
 from fastapi import FastAPI, HTTPException
 import uuid
 from azure.cosmos import exceptions
@@ -15,6 +15,26 @@ comments_container = database.get_container_client("comments")
 auctions_container = database.get_container_client("auctions")
 bids_container =     database.get_container_client("bids")
 
+
+
+# Default deleted user
+@app.on_event("startup")
+def ensure_deleted_user_exists():
+    deleted_user_id = "deleted-user"
+    try:
+        users_container.read_item(item=deleted_user_id, partition_key="USER")
+    except exceptions.CosmosResourceNotFoundError:
+        users_container.create_item({
+            "id": deleted_user_id,
+            "pk": "USER",
+            "nickname": "Deleted User",
+            "name": "Deleted User",
+            "photo_url": "",
+            "owned_sets": [],
+            "password": "",
+            "created_at": datetime.datetime.now().isoformat(),
+        })
+        print("Created default 'Deleted User'")
 
 
 # User
@@ -55,7 +75,7 @@ def get_user(id: str):
         user = users_container.read_item(item=id, partition_key="USER")
         return UserOutput(**user)
     except exceptions.CosmosResourceNotFoundError:
-        return {"error": "User not found"}
+        raise HTTPException(status_code=404, detail="User not found")
     
 @app.put("/rest/user/{id}")
 def update_user(id: str, updated_user: UserUpdate):
@@ -68,15 +88,47 @@ def update_user(id: str, updated_user: UserUpdate):
         users_container.replace_item(item=id, body=user)
         return user
     except exceptions.CosmosResourceNotFoundError:
-        return {"error": "User not found"}
+        raise HTTPException(status_code=404, detail="User not found")
     
 @app.delete("/rest/user/{id}")
 def delete_user(id: str):
     try:
+        users_container.read_item(item=id, partition_key="USER")
+
+        # Update all comments made by deleted user
+        comment_query = f"SELECT * FROM c WHERE c.user_id = '{id}'"
+        comments = list(comments_container.query_items(
+            query=comment_query, enable_cross_partition_query=True
+        ))
+        for comment in comments:
+            comment["user_id"] = "deleted-user"
+            comments_container.replace_item(item=comment["id"], body=comment)
+
+        # Update all auctions
+        auction_query = f"SELECT * FROM c WHERE c.seller_id = '{id}'"
+        auctions = list(auctions_container.query_items(
+            query=auction_query, enable_cross_partition_query=True
+        ))
+        for auction in auctions:
+            auction["seller_id"] = "deleted-user"
+            auctions_container.replace_item(item=auction["id"], body=auction)
+
+        # Update all bids
+        bid_query = f"SELECT * FROM c WHERE c.bidder_id = '{id}'"
+        bids = list(bids_container.query_items(
+            query=bid_query, enable_cross_partition_query=True
+        ))
+        for bid in bids:
+            bid["bidder_id"] = "deleted-user"
+            bids_container.replace_item(item=bid["id"], body=bid)
+
+        # Delete the user
         users_container.delete_item(item=id, partition_key="USER")
-        return {"status": "User deleted successfully"}
+
+        return {"status": f"User {id} deleted successfully"}
+
     except exceptions.CosmosResourceNotFoundError:
-        return {"error": "User not found"}
+        raise HTTPException(status_code=404, detail="User not found")
     
 # # Media
 # @app.post("/rest/media")
@@ -125,8 +177,18 @@ def get_legoset(id: str):
     except exceptions.CosmosResourceNotFoundError:
         return {"error": "Lego set not found"}
 
-# @app.put("/rest/legoset/{id}")
-# def update_legoset(id: str): ...
+@app.put("/rest/legoset/{id}")
+def update_legoset(id: str, updated_legoset: LegoSetUpdate):
+    try:
+        legoset = legosets_container.read_item(item=id, partition_key="LEGOSET")
+        updated_data = updated_legoset.dict(exclude_unset=True)
+        legoset.update(updated_data)
+        legosets_container.replace_item(item=id, body=legoset)
+        return legoset
+    except exceptions.CosmosResourceNotFoundError:
+        return {"error": "Lego set not found"}        
+
+
 @app.delete("/rest/legoset/{id}")
 def delete_legoset(id: str):
     try:
