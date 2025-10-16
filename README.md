@@ -11,5 +11,7 @@ fastapi dev main.py
 authors:
 
 Kacper Kuźnik 75267
+
 Dawid Bogacz 75160
+
 Mikołaj Nowacki 75231
