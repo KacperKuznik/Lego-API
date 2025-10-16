@@ -10,8 +10,8 @@ fastapi dev main.py
 
 authors:
 
-Kacper Kuźnik 75267
+Kacper Kuźnik 75267 k.kuznik@campus.fct.unl.pt
 
-Dawid Bogacz 75160
+Dawid Bogacz 75160 d.bogacz@campus.fct.unl.pt
 
-Mikołaj Nowacki 75231
+Mikołaj Nowacki 75231 m.nowacki@campus.fct.unl.pt
