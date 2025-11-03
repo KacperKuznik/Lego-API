@@ -148,6 +148,7 @@ def create_legoset(lego_set: LegoSetCreate):
         "code_number": lego_set.code_number,
         "description": lego_set.description,
         "photo_blob_names": lego_set.photo_blob_names,
+        "created_at": datetime.datetime.now().isoformat(),
         "owner_id": lego_set.owner_id,
     }
     legosets_container.create_item(new_lego_set)
@@ -188,7 +189,6 @@ def update_legoset(id: str, updated_legoset: LegoSetUpdate):
     except exceptions.CosmosResourceNotFoundError:
         return {"error": "Lego set not found"}        
 
-
 @app.delete("/rest/legoset/{id}")
 def delete_legoset(id: str):
     try:
@@ -196,6 +196,32 @@ def delete_legoset(id: str):
         return {"status": "Lego set deleted successfully"}
     except exceptions.CosmosResourceNotFoundError:
         return {"error": "Lego set not found"}
+
+# List of LegoSets of a given user
+@app.get("/rest/user/{user_id}/legosets")
+def list_legosets_of_user(user_id: str):
+    query = f"SELECT * FROM c WHERE c.owner_id = '{user_id}'"
+    legosets = list(legosets_container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+    if not legosets:
+        raise HTTPException(status_code=404, detail="No Lego sets found for this user")
+    legosets = [LegoSetOutput(**legoset) for legoset in legosets]
+    return legosets
+
+# List of most recently added LegoSets
+@app.get("/rest/legoset/recent")
+def list_recent_legosets(limit: int = 10):
+    query = f"SELECT * FROM c ORDER BY c.created_at DESC OFFSET 0 LIMIT {limit}"
+    legosets = list(legosets_container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+    if not legosets:
+        raise HTTPException(status_code=404, detail="No Lego sets found")
+    legosets = [LegoSetOutput(**legoset) for legoset in legosets]
+    return legosets
 
 
 # Comments
@@ -272,6 +298,19 @@ def list_auctions():
         query=query,
         enable_cross_partition_query=True
     ))
+    auctions = [AuctionOut(**auction) for auction in auctions]
+    return auctions
+
+# Search Auctions for a given LegoSet
+@app.get("/rest/auction/search")
+def search_auctions_by_legoset(legoset_id: str):
+    query = f"SELECT * FROM c WHERE c.legoset_id = '{legoset_id}'"
+    auctions = list(auctions_container.query_items(
+        query=query,
+        enable_cross_partition_query=True
+    ))
+    if not auctions:
+        raise HTTPException(status_code=404, detail="No auctions found for this Lego set")
     auctions = [AuctionOut(**auction) for auction in auctions]
     return auctions
 
