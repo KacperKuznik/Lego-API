@@ -51,4 +51,6 @@ uvicorn==0.37.0
 watchfiles==1.1.0
 websockets==15.0.1
 azure-functions
+azure-storage-blob==12.19.0
+Faker==21.0.0
 

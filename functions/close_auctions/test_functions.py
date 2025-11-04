@@ -3,9 +3,9 @@ import sys
 from datetime import datetime, timedelta
 
 # Setup environment
-os.environ['COSMOS_ENDPOINT'] = 'your-cosmos-endpoint'
-os.environ['COSMOS_KEY'] = 'your-cosmos-key' 
-os.environ['DATABASE_NAME'] = 'your-database-name'
+os.environ['COSMOS_ENDPOINT'] = os.getenv("COSMOS_ENDPOINT")
+os.environ['COSMOS_KEY'] = os.getenv("COSMOS_KEY") 
+os.environ['DATABASE_NAME'] = os.getenv("DATABASE_NAME")
 
 # Add functions to path
 sys.path.append('functions/close_auctions')

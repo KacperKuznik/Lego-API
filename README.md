@@ -4,6 +4,7 @@ FastAPI backend for managing Lego collections, users, auctions, and media. It us
 
 ```
 pip install -r requirements.txt
+python populate_db.py
 fastapi dev main.py
 
 ```

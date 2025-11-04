@@ -7,6 +7,8 @@ from rediscache import redis_client as r
 from fastapi import FastAPI, HTTPException
 import uuid
 from azure.cosmos import exceptions
+from blobstorage import BlobStorageManager
+
 
 app = FastAPI()
 users_container =    database.get_container_client("users")
@@ -16,6 +18,14 @@ auctions_container = database.get_container_client("auctions")
 bids_container =     database.get_container_client("bids")
 
 
+
+# Blob Storage
+# @app.on_event("startup")
+# def setup_blob_storage():
+#     from blobstorage import BlobStorageManager
+#     global blob_storage_manager
+#     blob_storage_manager = BlobStorageManager()
+#     print("Blob storage manager initialized")
 
 # Default deleted user
 @app.on_event("startup")
@@ -130,12 +140,22 @@ def delete_user(id: str):
     except exceptions.CosmosResourceNotFoundError:
         raise HTTPException(status_code=404, detail="User not found")
     
-# # Media
-# @app.post("/rest/media")
-# def upload_media(): ...
-# @app.get("/rest/media/{blob_name}")
-# def download_media(blob_name: str): 
-#     pass
+# Media endpoints
+@app.post("/rest/media")
+def upload_media():
+    raise HTTPException(status_code=501, detail="Not implemented - Use LegoSet creation endpoint instead")
+
+@app.get("/rest/media/{blob_name}")
+def get_media_url(blob_name: str):
+    try:
+        # Initialize blob storage manager
+        blob_manager = BlobStorageManager()
+        
+        # Get the URL for the blob
+        url = blob_manager.get_image_url(blob_name)
+        return {"url": url, "blob_name": blob_name}
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Image not found: {str(e)}")
 
 # LegoSet
 @app.post("/rest/legoset")
