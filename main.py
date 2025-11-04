@@ -287,6 +287,8 @@ def create_auction(auction: AuctionCreate):
         "seller_id": auction.seller_id,
         "base_price": float(auction.base_price),
         "close_date": auction.close_date.isoformat(),
+        "status": "open",  # Add initial status
+        "created_at": datetime.datetime.now().isoformat()
     } 
     auctions_container.create_item(new_auction)
     return new_auction

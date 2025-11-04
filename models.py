@@ -70,6 +70,7 @@ class AuctionCreate(BaseModel):
     seller_id: str
     base_price: float
     close_date: datetime.datetime
+    status: str="open"
 
 
 class AuctionOut(BaseModel):
@@ -79,7 +80,11 @@ class AuctionOut(BaseModel):
     base_price: float
     close_date: str
     # bids: Optional[List[str]] = [] # list of bid id's
-
+    status: str  # Add status
+    winner_id: Optional[str] = None
+    winning_bid: Optional[float] = None
+    closed_at: Optional[str] = None
+    created_at: Optional[str] = None
 
 class BidCreate(BaseModel):
     auction_id: str
@@ -92,3 +97,4 @@ class BidOut(BaseModel):
     auction_id: str
     bidder_id: str
     amount: float
+    created_at: Optional[str] = None
