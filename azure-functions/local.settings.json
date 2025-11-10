@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "<YOUR_AZURE_WEB_JOBS_STORAGE_CONNECTION_STRING_HERE>",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "COSMOS_ENDPOINT": "<YOUR_COSMOS_ENDPOINT_HERE>",
+    "COSMOS_KEY": "<YOUR_COSMOS_DB_KEY_HERE>",
+    "COSMOS_DATABASE_NAME": "legodb"
+  }
+}
