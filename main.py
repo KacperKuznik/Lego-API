@@ -188,13 +188,24 @@ def list_legosets():
     return legosets
 
 
-@app.get("/rest/legoset/{id}")
-def get_legoset(id: str):
+@app.get("/rest/user/{id}")
+def get_user(id: str):
+    if CACHING:
+        cached_user = r.get(f"user:{id}")
+        if cached_user:
+            return UserOutput(**json.loads(cached_user))
+
     try:
-        legoset = legosets_container.read_item(item=id, partition_key="LEGOSET")
-        return LegoSetOutput(**legoset)
+        user = users_container.read_item(item=id, partition_key="USER")
     except exceptions.CosmosResourceNotFoundError:
-        return {"error": "Lego set not found"}
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_output = UserOutput(**user)
+
+    if CACHING:
+        r.setex(f"user:{id}", 60, json.dumps(user_output.model_dump()))
+
+    return user_output
 
 @app.put("/rest/legoset/{id}")
 def update_legoset(id: str, updated_legoset: LegoSetUpdate):
@@ -229,15 +240,28 @@ def list_legosets_of_user(user_id: str):
 # List of most recently added LegoSets
 @app.post("/rest/legoset/recent")
 def list_recent_legosets(limit: int = 10):
+    cache_key = f"recent_legosets:{limit}"
+
+    if CACHING:
+        cached = r.get(cache_key)
+        if cached:
+            return [LegoSetOutput(**item) for item in json.loads(cached)]
+
     query = f"SELECT * FROM c ORDER BY c.created_at DESC OFFSET 0 LIMIT {limit}"
     legosets = list(legosets_container.query_items(
         query=query,
         enable_cross_partition_query=True
     ))
+
     if not legosets:
         raise HTTPException(status_code=404, detail="No Lego sets found")
-    legosets = [LegoSetOutput(**legoset) for legoset in legosets]
-    return legosets
+
+    legosets_output = [LegoSetOutput(**legoset) for legoset in legosets]
+
+    if CACHING:
+        r.setex(cache_key, 60, json.dumps([item.model_dump() for item in legosets_output]))
+
+    return legosets_output
 
 
 # Comments

@@ -5,8 +5,8 @@ config:
   processor: "./test-utils.js"
   phases:
     - name: "Main test" # MAIN TESTS: duration: 30s, with 10 new clients/sec
-      duration: 10 # NOTE: you should adjust the number of clients per second depending on the complexity
-      arrivalRate: 3 # of your scenarios. you need to try a number that can be handled by the server.
+      duration: 30 # NOTE: you should adjust the number of clients per second depending on the complexity
+      arrivalRate: 10 # of your scenarios. you need to try a number that can be handled by the server.
 
 scenarios:
   - name: "Create User"
@@ -37,3 +37,9 @@ scenarios:
     flow:
       - get:
           url: "/legoset"
+
+  - name: "Get recent legosets"
+    weight: 1
+    flow:
+      - post:
+          url: "/legoset/recent"
