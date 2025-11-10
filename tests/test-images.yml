@@ -1,0 +1,136 @@
+config:
+  target: "{{ $env.TARGET_URL }}"
+  plugins:
+    metrics-by-endpoint: {}
+  processor: "./test-utils.js"
+  phases:
+    - name: "Warm up" # WARM UP PHASE: duration: 10s, starting with 1 new client/sec up to 5 new clients/sec
+      duration: 5
+      arrivalRate: 1
+      rampTo: 5
+    - name: "Main test" # MAIN TESTS: duration: 30s, with 10 new clients/sec
+      duration: 10 # NOTE: you should adjust the number of clients per second depending on the complexity
+      arrivalRate: 3 # of your scenarios. you need to try a number that can be handled by the server.
+
+scenarios:
+  #user tests
+  - name: "Create User"
+    weight: 3
+    flow:
+      - function: "generateUserData"
+      - post:
+          url: "/user"
+          json:
+            nickname: "{{ nickname }}"
+            name: "{{ name }}"
+            password: "{{ password }}"
+
+  - name: "List Users"
+    weight: 1
+    flow:
+      - get:
+          url: "/user"
+
+  - name: "Update User"
+    weight: 1
+    flow:
+      - function: "fetchAllUsers"
+      - function: "getUserId"
+      - put:
+          url: "/user/{{ userId }}"
+          json:
+            nickname: "test"
+
+  # - name: "Delete User"
+  #   weight: 1
+  #   flow:
+  #     - function: "fetchAllUsers"
+  #     - function: "getUserId"
+  #     - delete:
+  #         url: "/user/{{ userId }}"
+
+  #legoset tests
+
+  - name: "Create LegoSet"
+    weight: 3
+    flow:
+      - function: "generateLegoSetData"
+      - function: "createLegoSet"
+
+  - name: "List LegoSets"
+    weight: 1
+    flow:
+      - get:
+          url: "/legoset"
+
+  - name: "Get LegoSet by ID"
+    weight: 1
+    flow:
+      - get:
+          url: "/rest/legoset/{{ legosetID }}"
+
+  - name: "Update LegoSet"
+    weight: 1
+    flow:
+      - function: "fetchAllLegoSetIds"
+      - function: "selectLegoSetId"
+      - put:
+          url: "/rest/legoset/{{ legosetID }}"
+          json:
+            name: "updated"
+            description: "test"
+
+  # - name: "Delete LegoSet"
+  #   weight: 1
+  #   flow:
+  #     - function: "fetchAllLegoSetIds"
+  #     - function: "selectLegoSetId"
+  #     - delete:
+  #         url: "/rest/legoset/{{ legoSetId }}"
+
+  - name: "list user legosets"
+    weight: 1
+    flow:
+      - function: "fetchAllUsers"
+      - function: "getUserId"
+      - get:
+          url: "/user/{{ userId }}/legosets"
+
+  - name: "recent legosets"
+    weight: 1
+    flow:
+      - post:
+          url: "/legoset/recent"
+          json:
+            limit: 10
+
+  - name: "comment on legosets"
+    weight: 1
+    flow:
+      - function: "fetchAllUsers"
+      - function: "getUserId"
+      - get:
+          url: "/legoset/{{ legoSetId }"
+          json:
+            user_id: "user"
+            text: "test"
+            legoset_id: "lego_id"
+
+  - name: "get auctions"
+    weight: 1
+    flow:
+      - get:
+          url: "/auction"
+
+  - name: "create auctions"
+    weight: 1
+    flow:
+      - function: "generateListingData"
+      - post:
+          url: "/auction"
+          json:
+            legoset_id: "{{ legoset_id }}"
+            seller_id: "{{ seller_id }}"
+            base_price: "{{ base_price }}"
+            close_date: "{{ close_date }}"
+            status: "{{ status }}"

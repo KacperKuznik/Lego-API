@@ -27,13 +27,6 @@ class MediaOutput(BaseModel):
     url: str
 
 
-class LegoSetCreate(BaseModel):
-    name: str
-    code_number: str
-    description: Optional[str] = None
-    photo_blob_names: List[str] = Field(..., min_items=1)
-    owner_id: Optional[str] = None
-
 class LegoSetUpdate(BaseModel):
     name: Optional[str] = None
     code_number: Optional[str] = None

@@ -210,3 +210,5 @@ __marimo__/
 /requirements.txt
 /lego-api
 requirements.txt
+
+/tests/node_modules/

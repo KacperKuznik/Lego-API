@@ -4,7 +4,7 @@ from models import *
 from utils import hash_password, verify_password
 from cosmosdb import database
 from rediscache import redis_client as r
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 import uuid
 from azure.cosmos import exceptions
 from blobstorage import BlobStorageManager
@@ -17,15 +17,6 @@ comments_container = database.get_container_client("comments")
 auctions_container = database.get_container_client("auctions")
 bids_container =     database.get_container_client("bids")
 
-
-
-# Blob Storage
-# @app.on_event("startup")
-# def setup_blob_storage():
-#     from blobstorage import BlobStorageManager
-#     global blob_storage_manager
-#     blob_storage_manager = BlobStorageManager()
-#     print("Blob storage manager initialized")
 
 # Default deleted user
 @app.on_event("startup")
@@ -140,11 +131,6 @@ def delete_user(id: str):
     except exceptions.CosmosResourceNotFoundError:
         raise HTTPException(status_code=404, detail="User not found")
     
-# Media endpoints
-@app.post("/rest/media")
-def upload_media():
-    raise HTTPException(status_code=501, detail="Not implemented - Use LegoSet creation endpoint instead")
-
 @app.get("/rest/media/{blob_name}")
 def get_media_url(blob_name: str):
     try:
@@ -159,17 +145,25 @@ def get_media_url(blob_name: str):
 
 # LegoSet
 @app.post("/rest/legoset")
-def create_legoset(lego_set: LegoSetCreate): 
+def create_legoset(
+        name: str = Form(...),
+        code_number: str = Form(...),
+        description: Optional[str] = Form(None),
+        owner_id: Optional[str] = Form(None),
+        files: List[UploadFile] = File(...)
+    ): 
+    blob_manager = BlobStorageManager()
+    photo_blob_names = blob_manager.upload_legoset_images(files, code_number)
     lego_set_id = uuid.uuid4()
     new_lego_set = {
         "id": str(lego_set_id),
-        "name": lego_set.name,
+        "name": name,
         "pk": "LEGOSET",
-        "code_number": lego_set.code_number,
-        "description": lego_set.description,
-        "photo_blob_names": lego_set.photo_blob_names,
+        "code_number": code_number,
+        "description": description,
+        "photo_blob_names": photo_blob_names,
         "created_at": datetime.datetime.now().isoformat(),
-        "owner_id": lego_set.owner_id,
+        "owner_id": owner_id,
     }
     legosets_container.create_item(new_lego_set)
     return new_lego_set
@@ -225,13 +219,11 @@ def list_legosets_of_user(user_id: str):
         query=query,
         enable_cross_partition_query=True
     ))
-    if not legosets:
-        raise HTTPException(status_code=404, detail="No Lego sets found for this user")
     legosets = [LegoSetOutput(**legoset) for legoset in legosets]
     return legosets
 
 # List of most recently added LegoSets
-@app.get("/rest/legoset/recent")
+@app.post("/rest/legoset/recent")
 def list_recent_legosets(limit: int = 10):
     query = f"SELECT * FROM c ORDER BY c.created_at DESC OFFSET 0 LIMIT {limit}"
     legosets = list(legosets_container.query_items(
@@ -324,7 +316,7 @@ def list_auctions():
     return auctions
 
 # Search Auctions for a given LegoSet
-@app.get("/rest/auction/search")
+@app.post("/rest/auction/search")
 def search_auctions_by_legoset(legoset_id: str):
     query = f"SELECT * FROM c WHERE c.legoset_id = '{legoset_id}'"
     auctions = list(auctions_container.query_items(

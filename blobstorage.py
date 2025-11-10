@@ -1,6 +1,7 @@
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import ResourceExistsError
 from dotenv import load_dotenv
+from fastapi import UploadFile
 import os
 import uuid
 from typing import List
@@ -23,30 +24,36 @@ class BlobStorageManager:
         except ResourceExistsError:
             pass
 
-    def upload_image(self, image_path: str, legoset_id: str) -> str:
+    def upload_image(self, file: UploadFile, legoset_id: str) -> str:
         # Get file extension
-        _, extension = os.path.splitext(image_path)
+        _, extension = os.path.splitext(file.filename)
         
         # Generate unique blob name
         blob_name = f"{legoset_id}/{str(uuid.uuid4())}{extension}"
         
         # Get content type
-        content_type = mimetypes.guess_type(image_path)[0]
+        content_type = file.content_type or mimetypes.guess_type(file.filename)[0]
         
-        # Upload the image
-        with open(image_path, "rb") as data:
-            self.container_client.upload_blob(
-                name=blob_name,
-                data=data,
-                content_type=content_type,
-                overwrite=True
-            )
+        # Upload directly from memory
+        self.container_client.upload_blob(
+            name=blob_name,
+            data=file.file,
+            content_type=content_type,
+            overwrite=True
+        )
         
         return blob_name
 
-    def upload_legoset_images(self, image_paths: List[str], legoset_id: str) -> List[str]:
-        return [self.upload_image(path, legoset_id) for path in image_paths]
-
+    def upload_legoset_images(self, files: List[UploadFile], legoset_id: str) -> List[str]:
+        uploaded_files = []
+        for file in files:
+            try:
+                blob_name = self.upload_image(file, legoset_id)
+                uploaded_files.append(blob_name)
+            except Exception as e:
+                print(f"Failed to upload {file.filename}: {e}")
+        return uploaded_files
+    
     def get_image_url(self, blob_name: str) -> str:
         blob_client = self.container_client.get_blob_client(blob_name)
         return blob_client.url
