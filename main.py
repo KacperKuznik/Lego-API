@@ -8,6 +8,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 import uuid
 from azure.cosmos import exceptions
 from blobstorage import BlobStorageManager
+from textblob import TextBlob
 
 
 app = FastAPI()
@@ -263,6 +264,33 @@ def list_recent_legosets(limit: int = 10):
 
     return legosets_output
 
+# list most liked LegoSets
+@app.get("/rest/legoset/most-liked")
+def get_most_liked_legosets(limit: int = 10):
+    legosets = list(legosets_container.query_items(
+        query="SELECT * FROM c",
+        enable_cross_partition_query=True
+    ))
+
+    liked_scores = []
+
+    for legoset in legosets:
+        legoset_id = legoset["id"]
+        comments = list(comments_container.query_items(
+            query=f"SELECT * FROM c WHERE c.legoset_id='{legoset_id}'",
+            enable_cross_partition_query=True
+        ))
+        if not comments:
+            continue
+        score = sum(TextBlob(c["text"]).sentiment.polarity for c in comments) / len(comments)
+        liked_scores.append({
+            "legoset_id": legoset_id,
+            "name": legoset["name"],
+            "score": score
+        })
+
+    liked_scores.sort(key=lambda x: x["score"], reverse=True)
+    return liked_scores[:limit]
 
 # Comments
 @app.post("/rest/legoset/{id}/comment")

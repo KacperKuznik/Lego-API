@@ -5,7 +5,7 @@ import random
 import datetime
 from cosmosdb import database
 from blobstorage import BlobStorageManager
-from models import UserCreate, LegoSetCreate, CommentCreate, AuctionCreate, BidCreate
+from models import UserCreate, LegoSetUpdate, CommentCreate, AuctionCreate, BidCreate
 import asyncio
 from typing import List
 import json
@@ -24,16 +24,33 @@ blob_manager = BlobStorageManager()
 
 # Load comment templates
 COMMENT_TEMPLATES = [
+    # Positive comments
     "I recently purchased the {product} and it was such a fun building experience!",
     "The {product} is amazing! It took me several hours to assemble.",
     "I was impressed by the detail and quality of the {product}.",
     "This {product} kept me entertained for hours.",
     "I love the {product}! It's the perfect mix of creativity and complexity.",
-    # Add more templates as needed
+    "Absolutely fantastic! {product} exceeded my expectations.",
+    "I highly recommend the {product} to anyone who loves Lego.",
+    "Building the {product} was a relaxing and rewarding experience.",
+    "The instructions for {product} were clear and easy to follow.",
+    "I can't stop looking at my completed {product} — it looks incredible!",
+
+    # Negative comments
+    "I was disappointed by the {product}, it felt cheaply made.",
+    "The {product} was frustrating to assemble and took longer than expected.",
+    "Some pieces of the {product} didn't fit properly.",
+    "I expected better quality from the {product}.",
+    "The {product} is overrated and not worth the price.",
+    "I found the {product} boring and repetitive to build.",
+    "Instructions for {product} were confusing and unclear.",
+    "Parts were missing from my {product} kit.",
+    "The {product} broke too easily during assembly.",
+    "I regret buying the {product}, it didn't meet my expectations."
 ]
 
+
 def create_user() -> dict:
-    """Create a new user with fake data"""
     first_name = fake.first_name()
     last_name = fake.last_name()
     nickname = f"{first_name}.{last_name}"
@@ -53,10 +70,9 @@ def create_user() -> dict:
     return users_container.create_item(body=user)
 
 def create_legoset(owner_id: str = None) -> dict:
-    """Create a new lego set with fake data and images"""
     # Get random images for this lego set (1-3 images)
     image_count = random.randint(1, 3)
-    base_path = os.path.join(os.path.dirname(__file__), "proj-test", "images")
+    base_path = os.path.join(os.path.dirname(__file__), "test", "images")
     available_images = [f for f in os.listdir(base_path) if f.endswith('.jpg')]
     selected_images = random.sample(available_images, image_count)
     image_paths = [os.path.join(base_path, img) for img in selected_images]
@@ -80,7 +96,6 @@ def create_legoset(owner_id: str = None) -> dict:
     return legosets_container.create_item(body=legoset)
 
 def create_comment(user_id: str, legoset_id: str, legoset_name: str) -> dict:
-    """Create a new comment for a lego set"""
     template = random.choice(COMMENT_TEMPLATES)
     comment = {
         "id": str(uuid.uuid4()),
@@ -94,7 +109,6 @@ def create_comment(user_id: str, legoset_id: str, legoset_name: str) -> dict:
     return comments_container.create_item(body=comment)
 
 def create_auction(legoset_id: str, seller_id: str) -> dict:
-    """Create a new auction for a lego set"""
     close_date = datetime.datetime.now() + datetime.timedelta(days=random.randint(1, 30))
     auction = {
         "id": str(uuid.uuid4()),
@@ -110,7 +124,6 @@ def create_auction(legoset_id: str, seller_id: str) -> dict:
     return auctions_container.create_item(body=auction)
 
 def create_bid(auction_id: str, bidder_id: str, current_price: float) -> dict:
-    """Create a new bid for an auction"""
     bid = {
         "id": str(uuid.uuid4()),
         "pk": auction_id,
@@ -123,7 +136,6 @@ def create_bid(auction_id: str, bidder_id: str, current_price: float) -> dict:
     return bids_container.create_item(body=bid)
 
 def populate_database():
-    """Populate the database with test data"""
     print("Creating users...")
     users = [create_user() for _ in range(200)]
     print(f"Created {len(users)} users")

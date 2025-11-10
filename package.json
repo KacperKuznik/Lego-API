@@ -1,0 +1,24 @@
+{
+  "name": "lego-api",
+  "version": "1.0.0",
+  "description": "FastAPI backend for managing Lego collections, users, auctions, and media. It uses Azure Cosmos DB for data storage and Azure Blob Storage for media files.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KacperKuznik/Lego-API.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/KacperKuznik/Lego-API/issues"
+  },
+  "homepage": "https://github.com/KacperKuznik/Lego-API#readme",
+  "dependencies": {
+    "@faker-js/faker": "^10.1.0"
+  }
+}

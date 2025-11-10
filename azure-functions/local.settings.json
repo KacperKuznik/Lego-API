@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "AccountEndpoint=https://75231lego.documents.azure.com:443/;AccountKey=l53IfCpepvqRyUYgWhlDZ7fdHWjeQq1ZoSDffPolyiYT9LqxrDmixE0IWc6kpunO6qbMcbOPLYNDACDbL0EFTQ==;",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "COSMOS_ENDPOINT": "https://75231lego.documents.azure.com:443/",
+    "COSMOS_KEY": "l53IfCpepvqRyUYgWhlDZ7fdHWjeQq1ZoSDffPolyiYT9LqxrDmixE0IWc6kpunO6qbMcbOPLYNDACDbL0EFTQ==",
+    "COSMOS_DATABASE_NAME": "legodb"
+  }
+}
