@@ -211,4 +211,4 @@ __marimo__/
 /lego-api
 requirements.txt
 
-/tests/node_modules/
+/tests/node_modules/azure-functions/local.settings.json
