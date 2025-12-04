@@ -35,6 +35,8 @@ Server runs on `http://localhost:8000`
 - `kubectl` configured to access your AKS cluster
 - Azure subscription with appropriate resource group
 
+Note: Personal or secret values should be stored in a local `.env` file (see `.env.example`). Never commit your `.env` file to the repository — it's already included in `.gitignore`.
+
 ### Step 1: Set Environment Variables
 
 ```powershell
