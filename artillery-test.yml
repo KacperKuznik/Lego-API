@@ -1,0 +1,55 @@
+{
+  "config": {
+    "target": "http://4.220.46.43",
+    "phases": [
+      {
+        "duration": 30,
+        "arrivalRate": 5,
+        "name": "Warm up"
+      },
+      {
+        "duration": 60,
+        "arrivalRate": 10,
+        "rampTo": 20,
+        "name": "Ramp up"
+      },
+      {
+        "duration": 30,
+        "arrivalRate": 20,
+        "name": "High load"
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "name": "GET user list",
+      "flow": [
+        {
+          "get": {
+            "url": "/rest/user"
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET legoset list",
+      "flow": [
+        {
+          "get": {
+            "url": "/rest/legoset"
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET auction list",
+      "flow": [
+        {
+          "get": {
+            "url": "/rest/auction"
+          }
+        }
+      ]
+    }
+  ]
+}

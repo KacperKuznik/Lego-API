@@ -1,5 +1,6 @@
 import json
 from typing import Union
+import datetime
 from models import *
 from utils import hash_password, verify_password
 from cosmosdb import database
@@ -430,3 +431,7 @@ def bid_auction(id: str, bid: BidCreate):
     bids_container.create_item(new_bid)
     return new_bid
 
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
