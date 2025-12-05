@@ -2,8 +2,7 @@
 
 FastAPI backend for managing Lego collections, users, auctions, and media. Fully deployed on Azure Kubernetes Service (AKS) with Redis caching, Cosmos DB, and NGINX ingress.
 
-**Live API:** http://4.220.35.115  
-**API Documentation:** http://4.220.35.115/docs
+**Note:** All deployment-specific values (IPs, resource names, credentials) are stored in `.env` file. See `.env.example` for required variables.
 
 ## Authors
 
@@ -51,10 +50,10 @@ The script will:
 #### Step 1: Set Environment Variables
 
 ```powershell
-$RESOURCE_GROUP = "cc2526"
-$AKS_CLUSTER = "legocluster"
-$ACR_NAME = "legoacr3853"
-$REGION = "norwayeast"  # Must be in allowed region policy
+$RESOURCE_GROUP = "<your-resource-group>"
+$AKS_CLUSTER = "<your-aks-cluster>"
+$ACR_NAME = "<your-acr-name>"
+$REGION = "<your-region>"  # Must be in allowed region policy (e.g., norwayeast, westeurope)
 ```
 
 #### Step 2: Create Azure Resources
@@ -79,7 +78,7 @@ az aks create `
 
 # Create Cosmos DB
 az cosmosdb create `
-    --name cc2526cosmos `
+    --name <your-cosmos-name> `
     --resource-group $RESOURCE_GROUP `
     --locations regionName=$REGION `
     --kind GlobalDocumentDB `
@@ -108,8 +107,9 @@ docker push "$($ACR_NAME).azurecr.io/lego-api:v4"
 
 Get your Cosmos DB credentials:
 ```powershell
-$COSMOS_ENDPOINT = az cosmosdb show --name cc2526cosmos --resource-group $RESOURCE_GROUP --query documentEndpoint -o tsv
-$COSMOS_KEY = az cosmosdb keys list --name cc2526cosmos --resource-group $RESOURCE_GROUP --query primaryMasterKey -o tsv
+$COSMOS_NAME = "<your-cosmos-name>"
+$COSMOS_ENDPOINT = az cosmosdb show --name $COSMOS_NAME --resource-group $RESOURCE_GROUP --query documentEndpoint -o tsv
+$COSMOS_KEY = az cosmosdb keys list --name $COSMOS_NAME --resource-group $RESOURCE_GROUP --query primaryMasterKey -o tsv
 ```
 
 Create the secret:
@@ -166,32 +166,26 @@ Invoke-WebRequest -Uri "http://$INGRESS_IP/docs"
 Invoke-WebRequest -Uri "http://$INGRESS_IP/rest/user"
 ```
 
-### Current Production Deployment
+### Testing Your Deployment
 
-**Live Environment:**
-- External IP: `4.220.35.115`
-- Swagger UI: http://4.220.35.115/docs
-- API Base: http://4.220.35.115/rest
+After deployment, get your ingress IP:
+```powershell
+$INGRESS_IP = kubectl get service -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+Write-Host "Your API is available at: http://$INGRESS_IP"
+```
 
-**Resource Details:**
-- Resource Group: `cc2526`
-- AKS Cluster: `legocluster` (1 node, Standard_B2s)
-- Container Registry: `legoacr3853`
-- Cosmos DB: `cc2526cosmos` (norwayeast)
-- Redis: In-cluster deployment (redis:7.2-alpine)
-
-**Verified Endpoints:**
+**Test Endpoints:**
 ```powershell
 # List users
-curl http://4.220.35.115/rest/user
+curl http://$INGRESS_IP/rest/user
 
 # Create user
-curl -X POST http://4.220.35.115/rest/user `
+curl -X POST http://$INGRESS_IP/rest/user `
   -H "Content-Type: application/json" `
   -d '{"nickname":"john","name":"John Doe","password":"pass123"}'
 
-# Get specific user
-curl http://4.220.35.115/rest/user/{user_id}
+# Access API documentation
+curl http://$INGRESS_IP/docs
 ```
 
 ## File Structure
