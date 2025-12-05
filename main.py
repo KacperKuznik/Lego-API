@@ -3,29 +3,53 @@ from typing import Union
 import datetime
 from models import *
 from utils import hash_password, verify_password
-from cosmosdb import database
 from rediscache import redis_client as r
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 import uuid
 from azure.cosmos import exceptions
 from blobstorage import BlobStorageManager
 from textblob import TextBlob
+import logging
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
-users_container =    database.get_container_client("users")
-legosets_container = database.get_container_client("legosets")
-comments_container = database.get_container_client("comments")
-auctions_container = database.get_container_client("auctions")
-bids_container =     database.get_container_client("bids")
+COSMOS_DB_AVAILABLE = False
+users_container = legosets_container = comments_container = auctions_container = bids_container = None
+
+try:
+    from cosmosdb import database
+    if database:
+        users_container = database.get_container_client("users")
+        legosets_container = database.get_container_client("legosets")
+        comments_container = database.get_container_client("comments")
+        auctions_container = database.get_container_client("auctions")
+        bids_container = database.get_container_client("bids")
+        COSMOS_DB_AVAILABLE = True
+        logger.info("Cosmos DB initialized successfully")
+    else:
+        logger.warning("Cosmos DB database is None")
+except Exception as e:
+    logger.error(f"Failed to initialize Cosmos DB: {e}")
+
+def ensure_db_available():
+    if not COSMOS_DB_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Cosmos DB not available")
+
 CACHING = True
 
 # Default deleted user
 @app.on_event("startup")
-def ensure_deleted_user_exists():
+async def ensure_deleted_user_exists():
+    if not COSMOS_DB_AVAILABLE:
+        logger.warning("Skipping deleted user creation - Cosmos DB not available")
+        return
+    
     deleted_user_id = "deleted-user"
     try:
         users_container.read_item(item=deleted_user_id, partition_key="USER")
+        logger.info("Deleted user already exists")
     except exceptions.CosmosResourceNotFoundError:
         users_container.create_item({
             "id": deleted_user_id,
@@ -43,6 +67,7 @@ def ensure_deleted_user_exists():
 # User
 @app.post("/rest/user")
 def create_user(user: UserCreate):    
+    ensure_db_available()
     user_id = uuid.uuid4()
     hashed_password = hash_password(user.password)
     user.password = hashed_password
@@ -60,6 +85,7 @@ def create_user(user: UserCreate):
 
 @app.get("/rest/user")
 def list_users():
+    ensure_db_available()
     if CACHING:
         cached_users = r.get("users_list")
         if cached_users:

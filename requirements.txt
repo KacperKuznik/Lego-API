@@ -9,3 +9,6 @@ passlib==1.7.4
 argon2-cffi==25.1.0
 argon2-cffi-bindings==25.1.0
 azure-cosmos==4.9.0
+azure-storage-blob==12.19.0
+textblob==0.17.1
+python-multipart==0.0.6

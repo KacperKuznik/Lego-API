@@ -21,12 +21,15 @@ function Load-DotEnv {
 Load-DotEnv
 
 # Read config from environment or use sensible defaults
-$resourceGroup    = $env:RESOURCE_GROUP    -ne $null ? $env:RESOURCE_GROUP    : "cc2526"
-$location         = $env:REGION            -ne $null ? $env:REGION            : "norwayeast"
-$acrName          = $env:ACR_NAME         -ne $null ? $env:ACR_NAME         : "legoacr$((Get-Random -Minimum 1000 -Maximum 9999))"
-$aksClusterName   = $env:AKS_CLUSTER      -ne $null ? $env:AKS_CLUSTER      : "legocluster"
-$storageAccountName = $env:STORAGE_ACCOUNT -ne $null ? $env:STORAGE_ACCOUNT : "legostorage$((Get-Random -Minimum 100 -Maximum 999))"
-$fileShareName    = $env:FILE_SHARE       -ne $null ? $env:FILE_SHARE       : "media"
+if ($env:RESOURCE_GROUP) { $resourceGroup = $env:RESOURCE_GROUP } else { $resourceGroup = "cc2526" }
+if ($env:REGION) { $location = $env:REGION } else { $location = "norwayeast" }
+if ($env:ACR_NAME) { $acrName = $env:ACR_NAME } else { $acrName = "legoacr$((Get-Random -Minimum 1000 -Maximum 9999))" }
+if ($env:AKS_CLUSTER) { $aksClusterName = $env:AKS_CLUSTER } else { $aksClusterName = "legocluster" }
+if ($env:STORAGE_ACCOUNT) { $storageAccountName = $env:STORAGE_ACCOUNT } else { $storageAccountName = "legostorage$((Get-Random -Minimum 100 -Maximum 999))" }
+if ($env:FILE_SHARE) { $fileShareName = $env:FILE_SHARE } else { $fileShareName = "media" }
+
+# Ensure resource group exists
+az group create --name $resourceGroup --location $location --output none
 
 Write-Host "Lego-API AKS Deployment" -ForegroundColor Cyan
 Write-Host "Resource Group: $resourceGroup ($location)" -ForegroundColor Yellow

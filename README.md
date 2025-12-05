@@ -1,26 +1,22 @@
 # Lego-API
 
-FastAPI backend for managing Lego collections, users, auctions, and media. Deployed on Azure Kubernetes Service (AKS) with Redis caching and Cosmos DB integration.
+FastAPI backend for managing Lego collections, users, auctions, and media. Fully deployed on Azure Kubernetes Service (AKS) with Redis caching, Cosmos DB, and NGINX ingress.
 
-```
-pip install -r requirements.txt
-python -m textblob.download_corpora
-python populate_db.py
-fastapi dev main.py
+**Live API:** http://4.220.35.115  
+**API Documentation:** http://4.220.35.115/docs
 
-```
+## Authors
 
-authors:
+- Kacper Kuźnik 75267 - k.kuznik@campus.fct.unl.pt
+- Dawid Bogacz 75160 - d.bogacz@campus.fct.unl.pt
+- Mikołaj Nowacki 75231 - m.nowacki@campus.fct.unl.pt
 
-Kacper Kuźnik 75267 k.kuznik@campus.fct.unl.pt
-
-Dawid Bogacz 75160 d.bogacz@campus.fct.unl.pt
-
-Mikołaj Nowacki 75231 m.nowacki@campus.fct.unl.pt
 ## Quick Start - Local Development
 
 ```bash
 pip install -r requirements.txt
+python -m textblob.download_corpora
+python populate_db.py
 fastapi dev main.py
 ```
 
@@ -28,28 +24,45 @@ Server runs on `http://localhost:8000`
 
 ## Production Deployment on Azure Kubernetes Service (AKS)
 
+### Automated Deployment
+
+Use the deployment script for automated resource provisioning:
+
+```powershell
+# Ensure .env file exists with required credentials
+.\deploy-aks.ps1
+```
+
+The script will:
+- Create resource group, ACR, AKS cluster, and storage
+- Attach ACR to AKS for seamless image pulling
+- Configure kubectl context automatically
+
 ### Prerequisites
 
-- Azure CLI (`az`) installed
+- Azure CLI (`az`) installed and logged in
 - Docker Desktop running
-- `kubectl` configured to access your AKS cluster
-- Azure subscription with appropriate resource group
+- `kubectl` installed
+- Azure subscription with appropriate permissions
+- `.env` file with secrets (see `.env.example`)
 
-Note: Personal or secret values should be stored in a local `.env` file (see `.env.example`). Never commit your `.env` file to the repository — it's already included in `.gitignore`.
+**Important:** Never commit your `.env` file — it's already in `.gitignore`.
 
-### Step 1: Set Environment Variables
+### Manual Deployment Steps
+
+#### Step 1: Set Environment Variables
 
 ```powershell
 $RESOURCE_GROUP = "cc2526"
 $AKS_CLUSTER = "legocluster"
-$ACR_NAME = "legoacr2572"
+$ACR_NAME = "legoacr3853"
 $REGION = "norwayeast"  # Must be in allowed region policy
 ```
 
-### Step 2: Create Azure Resources
+#### Step 2: Create Azure Resources
 
 ```powershell
-# Create resource group (if needed)
+# Create resource group
 az group create --name $RESOURCE_GROUP --location $REGION
 
 # Create Azure Container Registry
@@ -57,119 +70,179 @@ az acr create --resource-group $RESOURCE_GROUP --name $ACR_NAME --sku Basic
 
 # Create AKS cluster
 az aks create `
-	--resource-group $RESOURCE_GROUP `
-	--name $AKS_CLUSTER `
-	--node-count 1 `
-	--vm-set-type VirtualMachineScaleSets `
-	--load-balancer-sku standard `
-	--enable-managed-identity `
-	--network-plugin azure `
-	--region $REGION
+    --resource-group $RESOURCE_GROUP `
+    --name $AKS_CLUSTER `
+    --node-count 1 `
+    --node-vm-size Standard_B2s `
+    --enable-managed-identity `
+    --network-plugin azure `
+    --location $REGION `
+    --attach-acr $ACR_NAME
 
-# Get credentials
+# Create Cosmos DB
+az cosmosdb create `
+    --name cc2526cosmos `
+    --resource-group $RESOURCE_GROUP `
+    --locations regionName=$REGION `
+    --kind GlobalDocumentDB `
+    --default-consistency-level Session
+
+# Get AKS credentials
 az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_CLUSTER
 ```
 
-### Step 3: Build and Push Docker Image
+#### Step 3: Build and Push Docker Image
 
 ```powershell
 # Login to ACR
 az acr login --name $ACR_NAME
 
 # Build image
-docker build -t "$($ACR_NAME).azurecr.io/lego-api:v1" .
+docker build -t "$($ACR_NAME).azurecr.io/lego-api:v4" .
 
 # Push to ACR
-docker push "$($ACR_NAME).azurecr.io/lego-api:v1"
+docker push "$($ACR_NAME).azurecr.io/lego-api:v4"
 ```
 
-### Step 4: Deploy to Kubernetes
+#### Step 4: Deploy to Kubernetes
 
-#### 1. Create Cosmos DB Secret
+**1. Create Cosmos DB Secret**
 
+Get your Cosmos DB credentials:
 ```powershell
-$COSMOS_ENDPOINT = "https://your-cosmos-account.documents.azure.com:443/"
-$COSMOS_KEY = "your-cosmos-primary-key"
-$DATABASE_NAME = "lego_db"
-
-kubectl create secret generic cosmos-secret `
-	--from-literal=COSMOS_ENDPOINT=$COSMOS_ENDPOINT `
-	--from-literal=COSMOS_KEY=$COSMOS_KEY `
-	--from-literal=DATABASE_NAME=$DATABASE_NAME
+$COSMOS_ENDPOINT = az cosmosdb show --name cc2526cosmos --resource-group $RESOURCE_GROUP --query documentEndpoint -o tsv
+$COSMOS_KEY = az cosmosdb keys list --name cc2526cosmos --resource-group $RESOURCE_GROUP --query primaryMasterKey -o tsv
 ```
 
-#### 2. Deploy Redis Cache
+Create the secret:
+```powershell
+kubectl create secret generic cosmos-secret `
+    --from-literal=COSMOS_ENDPOINT=$COSMOS_ENDPOINT `
+    --from-literal=COSMOS_KEY=$COSMOS_KEY `
+    --from-literal=DATABASE_NAME=legodb
+```
+
+**2. Deploy Redis Cache (in-cluster)**
 
 ```powershell
 kubectl apply -f k8s/redis-deploy.yaml
 ```
 
-#### 3. Deploy Application
+**3. Deploy Application**
 
+Update the image reference in `k8s/app-deploy.yaml` or use kubectl:
 ```powershell
-# Update image in k8s/app-deploy.yaml if using different tag
-
 kubectl apply -f k8s/app-deploy.yaml
+kubectl set image deployment/lego-api lego-api=$ACR_NAME.azurecr.io/lego-api:v4
+kubectl set env deployment/lego-api REDIS_HOST=redis REDIS_PORT=6379 REDIS_KEY=''
 ```
 
-#### 4. Deploy Ingress Controller
+**4. Install NGINX Ingress Controller**
 
 ```powershell
-# Install NGINX Ingress Controller
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
-helm install nginx-ingress ingress-nginx/ingress-nginx `
-	--namespace ingress-basic `
-	--create-namespace `
-	--set controller.service.type=LoadBalancer
+# Apply the official manifest
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
 
 # Deploy ingress rules
 kubectl apply -f k8s/ingress.yaml
+
+# Wait for external IP assignment
+kubectl get service -n ingress-nginx ingress-nginx-controller --watch
 ```
 
-### Step 5: Verify Deployment
+#### Step 5: Verify Deployment
 
 ```powershell
 # Check pod status
-kubectl get pods
+kubectl get pods -A
 
 # View application logs
 kubectl logs deployment/lego-api --tail 50
 
-# Get ingress IP
-kubectl get service -A | Select-String "LoadBalancer"
+# Get ingress external IP
+kubectl get ingress -A
 
 # Test API endpoint
-Invoke-WebRequest -Uri "http://<INGRESS_IP>/rest/user" -Method GET
+$INGRESS_IP = kubectl get service -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+Invoke-WebRequest -Uri "http://$INGRESS_IP/docs"
+Invoke-WebRequest -Uri "http://$INGRESS_IP/rest/user"
+```
+
+### Current Production Deployment
+
+**Live Environment:**
+- External IP: `4.220.35.115`
+- Swagger UI: http://4.220.35.115/docs
+- API Base: http://4.220.35.115/rest
+
+**Resource Details:**
+- Resource Group: `cc2526`
+- AKS Cluster: `legocluster` (1 node, Standard_B2s)
+- Container Registry: `legoacr3853`
+- Cosmos DB: `cc2526cosmos` (norwayeast)
+- Redis: In-cluster deployment (redis:7.2-alpine)
+
+**Verified Endpoints:**
+```powershell
+# List users
+curl http://4.220.35.115/rest/user
+
+# Create user
+curl -X POST http://4.220.35.115/rest/user `
+  -H "Content-Type: application/json" `
+  -d '{"nickname":"john","name":"John Doe","password":"pass123"}'
+
+# Get specific user
+curl http://4.220.35.115/rest/user/{user_id}
 ```
 
 ## File Structure
 
 ```
 .
-├── main.py              # FastAPI application with REST endpoints
-├── cosmosdb.py          # Cosmos DB client initialization
-├── rediscache.py        # Redis cache client
-├── models.py            # Pydantic models
-├── utils.py             # Utility functions
-├── requirements.txt     # Python dependencies
-├── Dockerfile           # Container image definition
-└── k8s/                 # Kubernetes manifests
-		├── redis-deploy.yaml    # Redis in-cluster cache
-		├── app-deploy.yaml      # Application deployment
-		└── ingress.yaml         # NGINX ingress configuration
+├── main.py               # FastAPI application with REST endpoints
+├── cosmosdb.py           # Cosmos DB client initialization with error handling
+├── rediscache.py         # Redis cache client
+├── blobstorage.py        # Azure Blob Storage for media files
+├── models.py             # Pydantic models for validation
+├── utils.py              # Utility functions (password hashing, etc.)
+├── requirements.txt      # Python dependencies
+├── Dockerfile            # Optimized container image definition
+├── deploy-aks.ps1        # Automated deployment script
+├── .env.example          # Environment variable template
+└── k8s/                  # Kubernetes manifests
+    ├── redis-deploy.yaml    # Redis in-cluster cache deployment
+    ├── app-deploy.yaml      # Application deployment with secrets
+    └── ingress.yaml         # NGINX ingress configuration
 ```
 
-## Endpoints
+## API Endpoints
 
-- `POST /rest/user` - Create user
-- `GET /rest/user` - List all users
+**User Management:**
+- `POST /rest/user` - Create new user
+- `GET /rest/user` - List all users (with Redis caching, 60s TTL)
 - `GET /rest/user/{user_id}` - Get user by ID
+- `PUT /rest/user/{user_id}` - Update user
+- `DELETE /rest/user/{user_id}` - Delete user
+
+**Lego Sets:**
 - `GET /rest/legoset` - List all Lego sets
-- `POST /rest/legoset` - Create Lego set
+- `POST /rest/legoset` - Create Lego set (with image upload)
+
+**Auctions:**
 - `GET /rest/auction` - List all auctions
 - `POST /rest/auction` - Create auction
-- `POST /rest/bid` - Place bid
+- `GET /rest/auction/{auction_id}` - Get auction details
+
+**Bidding:**
+- `POST /rest/bid` - Place bid on auction
+
+**Media:**
+- `GET /rest/media/{blob_name}` - Get media URL
+
+**Documentation:**
+- `GET /docs` - Swagger UI (interactive API documentation)
+- `GET /openapi.json` - OpenAPI schema
 
 ## Load Testing
 
@@ -190,9 +263,32 @@ az group delete --name cc2526 --yes --no-wait
 
 ## Architecture
 
-- **Container Orchestration**: Azure Kubernetes Service (AKS) 1.32
+**Cloud Infrastructure:**
+- **Container Orchestration**: Azure Kubernetes Service (AKS) v1.32
 - **Container Registry**: Azure Container Registry (Basic SKU)
-- **Database**: Azure Cosmos DB (SQL API)
-- **Caching**: Redis 7.2-alpine (in-cluster)
-- **Ingress**: NGINX LoadBalancer
-- **Cost**: ~$1.40/day (single B2s node)
+- **Database**: Azure Cosmos DB (SQL API, Session consistency)
+- **Caching**: Redis 7.2-alpine (in-cluster deployment)
+- **Ingress**: NGINX Ingress Controller (LoadBalancer)
+- **Storage**: Azure Blob Storage (for media files)
+
+**Application Stack:**
+- **Framework**: FastAPI 0.118.0
+- **Server**: Uvicorn (async ASGI)
+- **Python**: 3.12-slim
+- **Dependencies**: 
+  - azure-cosmos 4.9.0
+  - azure-storage-blob 12.19.0
+  - redis 4.5.5
+  - pydantic 2.11.10
+  - passlib + argon2 (password hashing)
+
+**Cost Estimate**: ~$1.40/day (single Standard_B2s node, minimal throughput)
+
+**Features:**
+- ✅ Graceful error handling (DB/cache failures non-blocking)
+- ✅ Redis caching with TTL (60s for user lists)
+- ✅ Password hashing with Argon2
+- ✅ Sentiment analysis via TextBlob
+- ✅ Image upload to Azure Blob Storage
+- ✅ Comprehensive logging
+- ✅ Health check ready endpoints
