@@ -46,8 +46,6 @@ The script will:
 - Azure subscription with appropriate permissions
 - `.env` file with secrets (see `.env.example`)
 
-**Important:** Never commit your `.env` file — it's already in `.gitignore`.
-
 ### Manual Deployment Steps
 
 #### Step 1: Set Environment Variables
