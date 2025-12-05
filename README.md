@@ -275,12 +275,3 @@ az group delete --name cc2526 --yes --no-wait
   - passlib + argon2 (password hashing)
 
 **Cost Estimate**: ~$1.40/day (single Standard_B2s node, minimal throughput)
-
-**Features:**
-- ✅ Graceful error handling (DB/cache failures non-blocking)
-- ✅ Redis caching with TTL (60s for user lists)
-- ✅ Password hashing with Argon2
-- ✅ Sentiment analysis via TextBlob
-- ✅ Image upload to Azure Blob Storage
-- ✅ Comprehensive logging
-- ✅ Health check ready endpoints
